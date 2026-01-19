@@ -862,7 +862,7 @@ document.getElementById('recruit-btn').addEventListener('click', () => {
         const spawnX = state.capys.length > 0 ? state.capys[state.capys.length-1].x - 40 : -state.cameraX + 100;
         state.capys.push(new Capybara(spawnX, CONFIG.GROUND_Y + (Math.random()*40-20), 'BABY'));
         
-        state.recruitCost += 5; // Cost scales slightly
+        // state.recruitCost += 5; // Removed scaling cost
         updateHUD();
     } else {
         document.getElementById('orange-display').classList.add('shake');
@@ -902,5 +902,4 @@ loop();
 
 </script>
 </body>
-
 </html>
