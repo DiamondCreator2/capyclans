@@ -734,6 +734,7 @@ function updateGame() {
     });
 
     state.enemies = state.enemies.filter(e => !e.isDead);
+    state.capys = state.capys.filter(c => !c.isDead); // Added cleanup for dead capys
     state.projectiles = state.projectiles.filter(p => p.active);
     
     // Update Particles
