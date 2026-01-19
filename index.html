@@ -910,6 +910,22 @@ document.getElementById('pause-btn').addEventListener('click', () => {
     document.getElementById('pause-btn').innerText = state.paused ? '▶️' : '⏸️';
 });
 
+// Admin Mode Cheat
+let cheatBuffer = '';
+window.addEventListener('keydown', (e) => {
+    cheatBuffer += e.key.toLowerCase();
+    if (cheatBuffer.length > 10) cheatBuffer = cheatBuffer.slice(-10);
+    
+    if (cheatBuffer.endsWith('capys')) {
+        state.oranges += 10000;
+        state.capys.forEach(c => c.hp = c.maxHp);
+        spawnDamageText("ADMIN MODE ACTIVATED!", -state.cameraX + window.innerWidth/2, window.innerHeight/2);
+        createParticles(-state.cameraX + window.innerWidth/2, window.innerHeight/2, '#FFD700', 50);
+        updateHUD();
+        cheatBuffer = ''; 
+    }
+});
+
 function updateHUD() {
     document.getElementById('orange-display').innerText = state.oranges;
     document.getElementById('wave-display').innerText = state.wave;
