@@ -209,7 +209,7 @@ const state = {
 const CONFIG = {
     GROUND_Y: 0, 
     LANE_HEIGHT: 150,
-    MAX_SQUAD: 10,
+    MAX_SQUAD: 25,
     CLASSES: {
         BABY: { name: 'Baby Capy', hp: 20, dmg: 3, range: 40, speed: 1.5, color: '#8B5A2B', cost: 0, cd: 60, scale: 0.6, type: 'melee' },
         WARRIOR: { name: 'Knight Capy', hp: 120, dmg: 15, range: 50, speed: 0.8, color: '#6D4C41', cost: 50, cd: 80, scale: 1.1, type: 'melee' },
@@ -324,7 +324,7 @@ class Capybara extends Entity {
         spawnDamageText("EVOLVED!", this.x, this.y - 60);
     }
 
-    update(leaderX) {
+    update(leaderX, trailerX) {
         if (this.isDead) return;
 
         // Find Target
@@ -339,10 +339,18 @@ class Capybara extends Entity {
         }
         this.target = closest;
 
-        // Squad Cohesion: Catch up if too far behind the leader
+        // Squad Cohesion Logic
         let actualSpeed = this.speed;
-        if (leaderX !== undefined && (leaderX - this.x) > 300) {
-            actualSpeed *= 2.5; 
+
+        // 1. Sprint if falling slightly behind (tighter clumping)
+        if (leaderX !== undefined && (leaderX - this.x) > 50) { 
+            actualSpeed *= 2.0; 
+        }
+
+        // 2. Wait if too far ahead of the last member (keep the group together)
+        // Only apply if we aren't currently fighting
+        if (!this.target && trailerX !== undefined && (this.x - trailerX) > 100) {
+            actualSpeed = 0;
         }
 
         // Move or Attack
@@ -626,10 +634,6 @@ function createParticles(x, y, color, count) {
 }
 
 function spawnDamageText(text, x, y) {
-    const el = document.createElement('div');
-    el.className = 'damage-text';
-    el.innerText = text;
-    el.style.left = (x + state.cameraX) + 'px'; // Very rough cam mapping
     // Actually, DOM overlay is static, Canvas is scrolling.
     // We need to map World Coords to Screen Coords for DOM elements
     // For now, let's keep it simple: We need to update damage text position in loop or render text on canvas.
@@ -683,11 +687,13 @@ function updateGame() {
         updateHUD();
     }
 
-    // Calculate Leader Position (Rightmost Capy) to keep squad together
-    const leaderX = state.capys.length > 0 ? Math.max(...state.capys.map(c => c.x)) : 0;
+    // Calculate Leader Position (Rightmost Capy) and Trailer Position to keep squad together
+    const livingCapys = state.capys.filter(c => !c.isDead);
+    const leaderX = livingCapys.length > 0 ? Math.max(...livingCapys.map(c => c.x)) : 0;
+    const trailerX = livingCapys.length > 0 ? Math.min(...livingCapys.map(c => c.x)) : 0;
 
     // Update Entities
-    state.capys.forEach(e => e.update(leaderX));
+    state.capys.forEach(e => e.update(leaderX, trailerX));
     state.enemies.forEach(e => e.update());
     state.projectiles.forEach(p => p.update());
     
@@ -729,7 +735,18 @@ function updateGame() {
 
     state.enemies = state.enemies.filter(e => !e.isDead);
     state.projectiles = state.projectiles.filter(p => p.active);
+    
+    // Update Particles with much slower text decay
     state.particles = state.particles.filter(p => p.life > 0);
+    state.particles.forEach(p => {
+        if (p.update) {
+            p.update(); // Regular particles
+        } else {
+            // Text particle
+            p.y += p.vy * 0.5; // Float up slower
+            p.life -= 0.005;   // Fade out much slower (approx 3-4 seconds)
+        }
+    });
 
     // Camera follow center of mass of capys
     if (state.capys.length > 0) {
@@ -794,9 +811,9 @@ function drawGame() {
         } else {
             // Text particle
             ctx.fillStyle = `rgba(255, 255, 255, ${p.life})`;
-            ctx.font = "bold 24px 'Fredoka One'";
+            ctx.font = "bold 28px 'Fredoka One'"; // Larger text
             ctx.strokeStyle = 'black';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
             ctx.strokeText(p.text, p.x, p.y);
             ctx.fillText(p.text, p.x, p.y);
         }
@@ -941,6 +958,7 @@ function updateHUD() {
 // Init
 window.addEventListener('resize', resize);
 resize();
+document.getElementById('squad-max').innerText = CONFIG.MAX_SQUAD;
 updateHUD();
 
 // Start with one capy
