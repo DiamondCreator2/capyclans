@@ -213,7 +213,8 @@ const CONFIG = {
     CLASSES: {
         BABY: { name: 'Baby Capy', hp: 20, dmg: 3, range: 40, speed: 1.5, color: '#8B5A2B', cost: 0, cd: 60, scale: 0.6, type: 'melee' },
         WARRIOR: { name: 'Knight Capy', hp: 120, dmg: 15, range: 50, speed: 0.8, color: '#6D4C41', cost: 50, cd: 80, scale: 1.1, type: 'melee' },
-        RANGER: { name: 'Ranger Capy', hp: 60, dmg: 12, range: 250, speed: 1.2, color: '#A1887F', cost: 60, cd: 50, scale: 0.9, type: 'ranged' },
+        // Reduced Ranger range (250->150) and speed (1.2->0.9) to keep them with the pack
+        RANGER: { name: 'Ranger Capy', hp: 60, dmg: 12, range: 150, speed: 0.9, color: '#A1887F', cost: 60, cd: 50, scale: 0.9, type: 'ranged' },
         WIZARD: { name: 'Wizard Capy', hp: 45, dmg: 30, range: 200, speed: 0.7, color: '#5D4037', cost: 80, cd: 100, scale: 0.9, type: 'magic' }
     },
     ENEMIES: [
@@ -667,10 +668,14 @@ function updateGame() {
         state.enemies.push(new Enemy(spawnX, CONFIG.GROUND_Y + (Math.random()*40-20), enemyType));
     }
 
-    // Increase wave difficulty gradually
-    if (state.enemies.filter(e => e.isDead).length > state.wave * 5) {
+    // Increase wave difficulty
+    // Wave 1 ends after 3 kills. Wave 2 after 6 total kills, etc.
+    const killsNeeded = state.wave * 3;
+    if (state.totalEnemiesDefeated >= killsNeeded) {
         state.wave++;
         state.enemySpawnRate = Math.max(60, 300 - (state.wave * 15));
+        
+        spawnDamageText("WAVE " + state.wave + "!", -state.cameraX + window.innerWidth/2, CONFIG.GROUND_Y - 100);
         updateHUD();
     }
 
