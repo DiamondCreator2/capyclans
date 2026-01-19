@@ -736,7 +736,7 @@ function updateGame() {
     state.enemies = state.enemies.filter(e => !e.isDead);
     state.projectiles = state.projectiles.filter(p => p.active);
     
-    // Update Particles with much slower text decay
+    // Update Particles
     state.particles = state.particles.filter(p => p.life > 0);
     state.particles.forEach(p => {
         if (p.update) {
@@ -744,7 +744,7 @@ function updateGame() {
         } else {
             // Text particle
             p.y += p.vy * 0.5; // Float up slower
-            p.life -= 0.005;   // Fade out much slower (approx 3-4 seconds)
+            p.life -= 0.016;   // Fade out in approx 1 second
         }
     });
 
