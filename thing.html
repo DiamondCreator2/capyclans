@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capy Clans</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Nunito', sans-serif;
+            background-color: #333;
+            user-select: none;
+            touch-action: none;
+        }
+
+        h1, h2, h3, button {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F7FA 50%, #4CAF50 50%, #388E3C 100%);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+
+        /* Custom Scrollbar for unit list if needed */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.2); 
+            border-radius: 4px;
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .damage-text {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            text-shadow: 2px 2px 0 #000;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+        }
+
+        .hud-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border: 4px solid #8B5A2B;
+        }
+
+        .btn-primary {
+            background-color: #FF9800;
+            color: white;
+            border-bottom: 4px solid #E65100;
+            transition: all 0.1s;
+        }
+        .btn-primary:active {
+            transform: translateY(2px);
+            border-bottom: 0px solid transparent;
+        }
+        .btn-disabled {
+            background-color: #BDBDBD;
+            color: #757575;
+            border-bottom: 4px solid #9E9E9E;
+            cursor: not-allowed;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer" class="flex flex-col justify-between p-4">
+        
+        <!-- Top HUD -->
+        <div class="flex justify-between items-start pointer-events-auto">
+            <div class="hud-panel p-3 flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <span class="text-4xl">🍊</span>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase font-bold">Oranges</div>
+                        <div id="orange-display" class="text-2xl font-bold text-orange-600">0</div>
+                    </div>
+                </div>
+                <div class="w-px h-10 bg-gray-300"></div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-4xl">⚔️</span>
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase font-bold">Wave</div>
+                        <div id="wave-display" class="text-2xl font-bold text-blue-600">1</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="pause-btn" class="hud-panel p-3 text-2xl hover:bg-gray-100 btn-primary rounded-lg">
+                ⏸️
+            </button>
+        </div>
+
+        <!-- Bottom HUD -->
+        <div class="flex justify-center items-end space-x-4 pointer-events-auto pb-2">
+            
+            <!-- Selection Panel (Hidden by default) -->
+            <div id="selection-panel" class="hidden hud-panel p-4 w-96 flex flex-col space-y-2 relative">
+                <button id="close-selection" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold">X</button>
+                <h3 class="text-xl text-center text-amber-800 border-b-2 border-amber-100 pb-1" id="sel-name">Baby Capy</h3>
+                
+                <div class="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                    <div>❤️ HP: <span id="sel-hp" class="font-bold">10/10</span></div>
+                    <div>⚔️ DMG: <span id="sel-dmg" class="font-bold">2</span></div>
+                </div>
+
+                <div class="text-xs font-bold text-gray-400 uppercase mt-2">Evolutions</div>
+                <div id="evolution-options" class="grid grid-cols-3 gap-2">
+                    <!-- Evolution buttons injected here -->
+                </div>
+            </div>
+
+            <!-- Main Actions -->
+            <div class="hud-panel p-3 flex flex-col items-center">
+                <div class="text-xs font-bold text-gray-400 uppercase mb-1">Recruitment</div>
+                <button id="recruit-btn" class="btn-primary px-6 py-3 rounded-xl flex flex-col items-center w-40">
+                    <span class="text-lg">Recruit Capy</span>
+                    <span class="text-xs bg-black bg-opacity-20 px-2 py-0.5 rounded-full mt-1">🍊 <span id="recruit-cost">10</span></span>
+                </button>
+                <div class="text-xs text-gray-500 mt-1">Squad: <span id="squad-count">0</span>/<span id="squad-max">10</span></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * CAPY CLANS - Game Logic
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const uiLayer = document.getElementById('ui-layer');
+
+// Game State
+const state = {
+    oranges: 50,
+    wave: 1,
+    gameSpeed: 1,
+    paused: false,
+    lastTime: 0,
+    recruitCost: 15,
+    selectedEntity: null,
+    capys: [],
+    enemies: [],
+    projectiles: [],
+    particles: [],
+    enemySpawnTimer: 0,
+    enemySpawnRate: 200, // Frames
+    cameraX: 0,
+    screenShake: 0
+};
+
+// Configuration
+const CONFIG = {
+    GROUND_Y: 0, // Calculated on resize
+    LANE_HEIGHT: 150,
+    MAX_SQUAD: 10,
+    CLASSES: {
+        BABY: { name: 'Baby Capy', hp: 20, dmg: 3, range: 40, speed: 1.5, color: '#8B5A2B', cost: 0, cd: 60, scale: 0.6, type: 'melee' },
+        WARRIOR: { name: 'Knight Capy', hp: 120, dmg: 15, range: 50, speed: 0.8, color: '#6D4C41', cost: 50, cd: 80, scale: 1.1, type: 'melee' },
+        RANGER: { name: 'Ranger Capy', hp: 60, dmg: 12, range: 250, speed: 1.2, color: '#A1887F', cost: 60, cd: 50, scale: 0.9, type: 'ranged' },
+        WIZARD: { name: 'Wizard Capy', hp: 45, dmg: 30, range: 200, speed: 0.7, color: '#5D4037', cost: 80, cd: 100, scale: 0.9, type: 'magic' }
+    },
+    ENEMIES: [
+        { name: 'Croc', hp: 30, dmg: 5, range: 40, speed: -0.8, color: '#2E7D32', scale: 0.8, reward: 5 },
+        { name: 'Jaguar', hp: 80, dmg: 10, range: 40, speed: -1.5, color: '#FBC02D', scale: 1.0, reward: 15 },
+        { name: 'Eagle', hp: 40, dmg: 15, range: 150, speed: -2.0, color: '#5D4037', scale: 0.7, reward: 12 },
+        { name: 'Anaconda', hp: 300, dmg: 20, range: 60, speed: -0.5, color: '#1B5E20', scale: 1.3, reward: 50 }
+    ]
+};
+
+// --- Classes ---
+
+class Entity {
+    constructor(x, y, stats) {
+        this.id = Math.random().toString(36).substr(2, 9);
+        this.x = x;
+        this.y = y;
+        this.hp = stats.hp;
+        this.maxHp = stats.hp;
+        this.dmg = stats.dmg;
+        this.range = stats.range;
+        this.speed = stats.speed;
+        this.color = stats.color;
+        this.scale = stats.scale || 1;
+        this.cooldown = 0;
+        this.maxCooldown = stats.cd || 60;
+        this.isDead = false;
+        this.animFrame = 0;
+        this.hitFlash = 0;
+        this.width = 40 * this.scale;
+        this.height = 30 * this.scale;
+        this.stats = stats; // Store reference to stats config
+    }
+
+    takeDamage(amount) {
+        this.hp -= amount;
+        this.hitFlash = 10;
+        spawnDamageText(amount, this.x, this.y - 40);
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.isDead = true;
+            createParticles(this.x, this.y, this.color, 10);
+        }
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Bobbing animation
+        const bob = Math.sin(Date.now() / 200) * 3;
+        ctx.translate(0, bob);
+
+        // Flash white if hit
+        if (this.hitFlash > 0) {
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = 'white';
+            this.hitFlash--;
+        }
+
+        // Draw Health Bar
+        const hpPct = this.hp / this.maxHp;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(-20, -40, 40, 6);
+        ctx.fillStyle = hpPct > 0.5 ? '#4CAF50' : '#F44336';
+        ctx.fillRect(-20, -40, 40 * hpPct, 6);
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(0, 10, 20 * this.scale, 5 * this.scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        this.drawBody(ctx);
+
+        ctx.restore();
+    }
+
+    drawBody(ctx) {
+        // Placeholder, overridden by subclasses
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-20, -20, 40, 40);
+    }
+}
+
+class Capybara extends Entity {
+    constructor(x, y, type) {
+        super(x, y, CONFIG.CLASSES[type]);
+        this.type = type; // 'BABY', 'WARRIOR', etc.
+        this.level = 1;
+        this.target = null;
+    }
+
+    evolve(newType) {
+        const stats = CONFIG.CLASSES[newType];
+        this.type = newType;
+        this.maxHp = stats.hp;
+        this.hp = stats.hp; // Heal on evolve
+        this.dmg = stats.dmg;
+        this.range = stats.range;
+        this.speed = stats.speed;
+        this.maxCooldown = stats.cd;
+        this.stats = stats;
+        this.scale = stats.scale;
+        this.width = 40 * this.scale;
+        this.height = 30 * this.scale;
+        
+        createParticles(this.x, this.y, '#FFD700', 20); // Gold particles
+        spawnDamageText("EVOLVED!", this.x, this.y - 60);
+    }
+
+    update() {
+        if (this.isDead) return;
+
+        // Find Target
+        let closest = null;
+        let dist = Infinity;
+        for (const e of state.enemies) {
+            const d = Math.abs(e.x - this.x);
+            if (d < dist && e.x > this.x) { // Only target enemies in front
+                dist = d;
+                closest = e;
+            }
+        }
+        this.target = closest;
+
+        // Move or Attack
+        if (this.target && dist <= this.range) {
+            // Attack
+            if (this.cooldown <= 0) {
+                this.attack(this.target);
+                this.cooldown = this.maxCooldown;
+            }
+        } else {
+            // Move (slowly if no target, or towards right)
+            this.x += this.speed;
+        }
+
+        if (this.cooldown > 0) this.cooldown--;
+    }
+
+    attack(target) {
+        if (this.stats.type === 'ranged' || this.stats.type === 'magic') {
+            state.projectiles.push(new Projectile(this.x, this.y - 10, target, this.dmg, this.stats.type));
+        } else {
+            // Melee bonk
+            target.takeDamage(this.dmg);
+            // Visual lung
+            this.x += 10;
+            setTimeout(() => this.x -= 10, 100);
+            createParticles(target.x, target.y, '#FFF', 3);
+        }
+    }
+
+    drawBody(ctx) {
+        // Body (Potato shape)
+        ctx.fillStyle = this.color;
+        roundRect(ctx, -20 * this.scale, -15 * this.scale, 40 * this.scale, 30 * this.scale, 10);
+        ctx.fill();
+
+        // Head
+        roundRect(ctx, 5 * this.scale, -25 * this.scale, 20 * this.scale, 25 * this.scale, 8);
+        ctx.fill();
+
+        // Eye
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(15 * this.scale, -15 * this.scale, 2 * this.scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Snout
+        ctx.fillStyle = '#3E2723';
+        roundRect(ctx, 22 * this.scale, -12 * this.scale, 5 * this.scale, 8 * this.scale, 2);
+        ctx.fill();
+
+        // Accessories based on Class
+        if (this.type === 'WARRIOR') {
+            // Helmet
+            ctx.fillStyle = '#90A4AE';
+            ctx.beginPath();
+            ctx.moveTo(5 * this.scale, -25 * this.scale);
+            ctx.lineTo(25 * this.scale, -25 * this.scale);
+            ctx.lineTo(25 * this.scale, -10 * this.scale);
+            ctx.lineTo(5 * this.scale, -10 * this.scale);
+            ctx.fill();
+            // Sword
+            ctx.fillStyle = '#CFD8DC';
+            ctx.fillRect(10 * this.scale, 5 * this.scale, 25 * this.scale, 4 * this.scale);
+        } else if (this.type === 'RANGER') {
+            // Headband
+            ctx.fillStyle = '#C62828';
+            ctx.fillRect(5 * this.scale, -22 * this.scale, 22 * this.scale, 4 * this.scale);
+            // Bow
+            ctx.strokeStyle = '#8D6E63';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(15 * this.scale, 5 * this.scale, 15 * this.scale, -Math.PI/2, Math.PI/2);
+            ctx.stroke();
+        } else if (this.type === 'WIZARD') {
+            // Hat
+            ctx.fillStyle = '#4A148C';
+            ctx.beginPath();
+            ctx.moveTo(0, -25 * this.scale);
+            ctx.lineTo(30 * this.scale, -25 * this.scale);
+            ctx.lineTo(15 * this.scale, -50 * this.scale);
+            ctx.fill();
+            // Staff
+            ctx.strokeStyle = '#8D6E63';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(25 * this.scale, 10 * this.scale);
+            ctx.lineTo(25 * this.scale, -20 * this.scale);
+            ctx.stroke();
+            ctx.fillStyle = '#00BCD4';
+            ctx.beginPath();
+            ctx.arc(25 * this.scale, -20 * this.scale, 4 * this.scale, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // Selection Highlight
+        if (state.selectedEntity === this) {
+            ctx.strokeStyle = '#FFEB3B';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 30 * this.scale, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+}
+
+class Enemy extends Entity {
+    constructor(x, y, typeName) {
+        const template = CONFIG.ENEMIES.find(e => e.name === typeName) || CONFIG.ENEMIES[0];
+        super(x, y, template);
+        this.name = template.name;
+        this.reward = template.reward;
+        // Scale HP based on wave
+        this.maxHp = Math.floor(this.maxHp * (1 + (state.wave * 0.2)));
+        this.hp = this.maxHp;
+        this.dmg = Math.floor(this.dmg * (1 + (state.wave * 0.1)));
+    }
+
+    update() {
+        if (this.isDead) return;
+
+        let closest = null;
+        let dist = Infinity;
+        for (const c of state.capys) {
+            const d = Math.abs(c.x - this.x);
+            if (d < dist && c.x < this.x) {
+                dist = d;
+                closest = c;
+            }
+        }
+
+        if (closest && dist <= this.range) {
+            if (this.cooldown <= 0) {
+                closest.takeDamage(this.dmg);
+                this.cooldown = 60;
+                this.x -= 5; 
+                setTimeout(() => this.x += 5, 100);
+            }
+        } else {
+            this.x += this.speed; // Move left
+        }
+        
+        if (this.cooldown > 0) this.cooldown--;
+
+        // Despawn if too far left
+        if (this.x < -100) this.isDead = true;
+    }
+
+    drawBody(ctx) {
+        ctx.fillStyle = this.color;
+        // Simple distinct shapes for enemies
+        if (this.name === 'Croc') {
+            // Long snout
+            roundRect(ctx, -25, -15, 50, 20, 5);
+            ctx.fill();
+            // Tail
+            ctx.beginPath();
+            ctx.moveTo(25, -5);
+            ctx.lineTo(40, 0);
+            ctx.lineTo(25, 5);
+            ctx.fill();
+            // Eye
+            ctx.fillStyle = 'yellow';
+            ctx.beginPath();
+            ctx.arc(-15, -10, 3, 0, Math.PI*2);
+            ctx.fill();
+        } else if (this.name === 'Eagle') {
+            // Wings
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-20, -30);
+            ctx.lineTo(20, -30);
+            ctx.fill();
+            // Body
+            ctx.beginPath();
+            ctx.arc(0, 0, 15, 0, Math.PI*2);
+            ctx.fill();
+            // Beak
+            ctx.fillStyle = 'orange';
+            ctx.beginPath();
+            ctx.moveTo(-10, 0);
+            ctx.lineTo(-20, 5);
+            ctx.lineTo(-10, 10);
+            ctx.fill();
+        } else {
+            // Generic Blob
+            ctx.beginPath();
+            ctx.arc(0, 0, 20 * this.scale, 0, Math.PI * 2);
+            ctx.fill();
+            // Evil Eyes
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.moveTo(-10, -5); ctx.lineTo(-5, 0); ctx.lineTo(-10, 5);
+            ctx.moveTo(5, -5); ctx.lineTo(10, 0); ctx.lineTo(5, 5);
+            ctx.fill();
+        }
+    }
+}
+
+class Projectile {
+    constructor(x, y, target, dmg, type) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.dmg = dmg;
+        this.type = type; // 'ranged' (arrow) or 'magic' (orb)
+        this.speed = type === 'ranged' ? 8 : 5;
+        this.active = true;
+    }
+
+    update() {
+        if (!this.active) return;
+        
+        const dx = this.target.x - this.x;
+        const dy = (this.target.y - 20) - this.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < 10) {
+            this.active = false;
+            this.target.takeDamage(this.dmg);
+            createParticles(this.target.x, this.target.y, this.type === 'magic' ? '#00BCD4' : '#8D6E63', 5);
+        } else {
+            this.x += (dx / dist) * this.speed;
+            this.y += (dy / dist) * this.speed;
+        }
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = this.type === 'magic' ? '#00BCD4' : '#5D4037';
+        ctx.beginPath();
+        if (this.type === 'magic') {
+            ctx.arc(this.x, this.y, 5, 0, Math.PI*2);
+        } else {
+            ctx.fillRect(this.x - 5, this.y - 1, 10, 2);
+        }
+        ctx.fill();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 5;
+        this.vy = (Math.random() - 0.5) * 5;
+        this.life = 1.0;
+        this.color = color;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.05;
+    }
+    draw(ctx) {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, 4, 4);
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+// --- Utils ---
+
+function roundRect(ctx, x, y, w, h, r) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function createParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        state.particles.push(new Particle(x, y, color));
+    }
+}
+
+function spawnDamageText(text, x, y) {
+    const el = document.createElement('div');
+    el.className = 'damage-text';
+    el.innerText = text;
+    el.style.left = (x + state.cameraX) + 'px'; // Very rough cam mapping
+    // Actually, DOM overlay is static, Canvas is scrolling.
+    // We need to map World Coords to Screen Coords for DOM elements
+    // For now, let's keep it simple: We need to update damage text position in loop or render text on canvas.
+    // Rendering text on canvas is smoother.
+    state.particles.push({
+        type: 'text', text: text, x: x, y: y, life: 1.0, vy: -1
+    });
+}
+
+// --- Game Logic ---
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    CONFIG.GROUND_Y = canvas.height * 0.75;
+}
+
+function updateGame() {
+    if (state.paused) return;
+
+    // Spawning Enemies
+    state.enemySpawnTimer++;
+    if (state.enemySpawnTimer > state.enemySpawnRate) {
+        state.enemySpawnTimer = 0;
+        // Pick enemy based on wave
+        const enemyType = state.wave % 5 === 0 ? 'Anaconda' : 
+                          state.wave > 3 ? ['Jaguar', 'Eagle'][Math.floor(Math.random()*2)] :
+                          'Croc';
+        
+        // Spawn offscreen right
+        // We need to know where the "front" of the battle is. 
+        // Or just spawn relative to the rightmost Capy + screen width.
+        // Let's spawn them at fixed intervals relative to camera or rightmost capy.
+        const rightmostX = state.capys.length > 0 
+            ? Math.max(...state.capys.map(c => c.x)) 
+            : 0;
+        
+        const spawnX = Math.max(rightmostX + 600, canvas.width + state.cameraX + 100);
+        
+        state.enemies.push(new Enemy(spawnX, CONFIG.GROUND_Y + (Math.random()*40-20), enemyType));
+    }
+
+    // Increase wave difficulty gradually
+    if (state.enemies.filter(e => e.isDead).length > state.wave * 5) {
+        state.wave++;
+        state.enemySpawnRate = Math.max(50, 200 - (state.wave * 10));
+        updateHUD();
+    }
+
+    // Update Entities
+    state.capys.forEach(e => e.update());
+    state.enemies.forEach(e => e.update());
+    state.projectiles.forEach(p => p.update());
+    state.particles.forEach(p => {
+        if(p.update) p.update();
+        else { // Text particle
+            p.y += p.vy;
+            p.life -= 0.02;
+        }
+    });
+
+    // Clean up
+    state.capys = state.capys.filter(e => !e.isDead);
+    
+    // Reward for dead enemies
+    const deadEnemies = state.enemies.filter(e => e.isDead && e.hp <= 0); // hp check ensures we don't count despawns
+    deadEnemies.forEach(e => {
+        state.oranges += e.reward;
+        spawnDamageText(`+${e.reward}🍊`, e.x, e.y - 20);
+        updateHUD();
+    });
+
+    state.enemies = state.enemies.filter(e => !e.isDead);
+    state.projectiles = state.projectiles.filter(p => p.active);
+    state.particles = state.particles.filter(p => p.life > 0);
+
+    // Camera follow center of mass of capys
+    if (state.capys.length > 0) {
+        let avgX = state.capys.reduce((sum, c) => sum + c.x, 0) / state.capys.length;
+        // Camera target
+        const targetCamX = -avgX + canvas.width * 0.4;
+        // Smooth lerp
+        state.cameraX += (targetCamX - state.cameraX) * 0.1;
+    } else {
+        // Reset cam if everyone dead
+         state.cameraX += (0 - state.cameraX) * 0.1;
+    }
+    
+    // Squad Count UI
+    document.getElementById('squad-count').innerText = state.capys.length;
+}
+
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    
+    // Parallax Background
+    // Sky is CSS, we just draw elements
+    // Mountains
+    ctx.translate(state.cameraX * 0.2, 0); // Far background moves slow
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height);
+    for(let i=0; i<20; i++) {
+        ctx.lineTo(i * 300, canvas.height - 200 - (i%2)*100);
+    }
+    ctx.lineTo(6000, canvas.height);
+    ctx.fill();
+    
+    // Ground
+    ctx.restore();
+    ctx.save();
+    ctx.translate(state.cameraX, 0); // Game World
+
+    // Draw Ground Line
+    ctx.fillStyle = '#558B2F';
+    ctx.fillRect(-1000, CONFIG.GROUND_Y + 20, 100000, canvas.height - CONFIG.GROUND_Y);
+    // River
+    ctx.fillStyle = '#4FC3F7';
+    ctx.fillRect(-1000, CONFIG.GROUND_Y + 100, 100000, 40);
+
+    // Draw Shadows
+    // Handled in Entity
+
+    // Draw Entities (Sort by Y for depth)
+    const allEntities = [...state.capys, ...state.enemies].sort((a,b) => a.y - b.y);
+    allEntities.forEach(e => e.draw(ctx));
+
+    // Draw Projectiles
+    state.projectiles.forEach(p => p.draw(ctx));
+
+    // Draw Particles
+    state.particles.forEach(p => {
+        if (p.update) {
+            p.draw(ctx);
+        } else {
+            // Text particle
+            ctx.fillStyle = `rgba(255, 255, 255, ${p.life})`;
+            ctx.font = "bold 24px 'Fredoka One'";
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            ctx.strokeText(p.text, p.x, p.y);
+            ctx.fillText(p.text, p.x, p.y);
+        }
+    });
+
+    ctx.restore();
+}
+
+function loop() {
+    updateGame();
+    drawGame();
+    requestAnimationFrame(loop);
+}
+
+// --- Interaction ---
+
+canvas.addEventListener('mousedown', (e) => {
+    // Check clicks on Capys
+    // Need to account for Camera
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left - state.cameraX;
+    const clickY = e.clientY - rect.top;
+
+    let clicked = null;
+    // Reverse iterate to click top items first
+    for (let i = state.capys.length - 1; i >= 0; i--) {
+        const c = state.capys[i];
+        if (clickX > c.x - 30 && clickX < c.x + 30 &&
+            clickY > c.y - 50 && clickY < c.y + 20) {
+            clicked = c;
+            break;
+        }
+    }
+
+    if (clicked) {
+        selectCapy(clicked);
+    } else {
+        closeSelection();
+    }
+});
+
+function selectCapy(capy) {
+    state.selectedEntity = capy;
+    const panel = document.getElementById('selection-panel');
+    panel.classList.remove('hidden');
+    
+    document.getElementById('sel-name').innerText = capy.stats.name;
+    document.getElementById('sel-hp').innerText = `${Math.floor(capy.hp)}/${capy.maxHp}`;
+    document.getElementById('sel-dmg').innerText = capy.dmg;
+
+    // Render Evolution Options
+    const evoContainer = document.getElementById('evolution-options');
+    evoContainer.innerHTML = '';
+
+    if (capy.type === 'BABY') {
+        ['WARRIOR', 'RANGER', 'WIZARD'].forEach(type => {
+            const data = CONFIG.CLASSES[type];
+            const btn = document.createElement('button');
+            const canAfford = state.oranges >= data.cost;
+            btn.className = `p-2 rounded text-xs font-bold text-center flex flex-col items-center ${canAfford ? 'bg-amber-100 hover:bg-amber-200 border border-amber-300' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`;
+            btn.innerHTML = `<span>${data.name}</span><span>🍊${data.cost}</span>`;
+            
+            if (canAfford) {
+                btn.onclick = () => {
+                    if (state.oranges >= data.cost) {
+                        state.oranges -= data.cost;
+                        capy.evolve(type);
+                        updateHUD();
+                        selectCapy(capy); // Refresh UI
+                    }
+                };
+            }
+            evoContainer.appendChild(btn);
+        });
+    } else {
+        evoContainer.innerHTML = '<div class="col-span-3 text-center text-gray-500 italic text-xs">Max Evolution Reached</div>';
+    }
+}
+
+function closeSelection() {
+    state.selectedEntity = null;
+    document.getElementById('selection-panel').classList.add('hidden');
+}
+
+document.getElementById('close-selection').addEventListener('click', closeSelection);
+
+document.getElementById('recruit-btn').addEventListener('click', () => {
+    if (state.capys.length >= CONFIG.MAX_SQUAD) {
+        spawnDamageText("Squad Full!", -state.cameraX + window.innerWidth/2, window.innerHeight/2);
+        return;
+    }
+    if (state.oranges >= state.recruitCost) {
+        state.oranges -= state.recruitCost;
+        // Spawn slightly left of center or near other capys
+        const spawnX = state.capys.length > 0 ? state.capys[state.capys.length-1].x - 40 : -state.cameraX + 100;
+        state.capys.push(new Capybara(spawnX, CONFIG.GROUND_Y + (Math.random()*40-20), 'BABY'));
+        
+        state.recruitCost += 5; // Cost scales slightly
+        updateHUD();
+    } else {
+        document.getElementById('orange-display').classList.add('shake');
+        setTimeout(() => document.getElementById('orange-display').classList.remove('shake'), 500);
+    }
+});
+
+document.getElementById('pause-btn').addEventListener('click', () => {
+    state.paused = !state.paused;
+    document.getElementById('pause-btn').innerText = state.paused ? '▶️' : '⏸️';
+});
+
+function updateHUD() {
+    document.getElementById('orange-display').innerText = state.oranges;
+    document.getElementById('wave-display').innerText = state.wave;
+    document.getElementById('recruit-cost').innerText = state.recruitCost;
+    
+    const recruitBtn = document.getElementById('recruit-btn');
+    if (state.oranges < state.recruitCost) {
+        recruitBtn.classList.add('btn-disabled');
+        recruitBtn.classList.remove('btn-primary');
+    } else {
+        recruitBtn.classList.remove('btn-disabled');
+        recruitBtn.classList.add('btn-primary');
+    }
+}
+
+// Init
+window.addEventListener('resize', resize);
+resize();
+updateHUD();
+
+// Start with one capy
+state.capys.push(new Capybara(200, CONFIG.GROUND_Y, 'BABY'));
+
+loop();
+
+</script>
+</body>
+</html>
