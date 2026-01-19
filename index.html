@@ -189,6 +189,7 @@ const uiLayer = document.getElementById('ui-layer');
 const state = {
     oranges: 50,
     wave: 1,
+    totalEnemiesDefeated: 0, // Added tracker
     gameSpeed: 1,
     paused: false,
     lastTime: 0,
@@ -690,8 +691,36 @@ function updateGame() {
     // Reward for dead enemies
     const deadEnemies = state.enemies.filter(e => e.isDead && e.hp <= 0); // hp check ensures we don't count despawns
     deadEnemies.forEach(e => {
-        state.oranges += e.reward;
-        spawnDamageText(`+${e.reward}🍊`, e.x, e.y - 20);
+        // Track kills
+        state.totalEnemiesDefeated++;
+        
+        // Calculate Rewards (Base + Bonus for total kills)
+        const killBonus = Math.floor(state.totalEnemiesDefeated / 5);
+        const totalReward = e.reward + killBonus;
+        
+        state.oranges += totalReward;
+        spawnDamageText(`+${totalReward}🍊`, e.x, e.y - 40);
+
+        // Healing Logic: Heal the closest Capybara
+        let closestCapy = null;
+        let minDist = Infinity;
+        state.capys.forEach(c => {
+            if (!c.isDead) {
+                const dist = Math.abs(c.x - e.x);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestCapy = c;
+                }
+            }
+        });
+
+        if (closestCapy && minDist < 400) {
+            const healAmount = Math.floor(closestCapy.maxHp * 0.2); // Heal 20%
+            closestCapy.hp = Math.min(closestCapy.maxHp, closestCapy.hp + healAmount);
+            spawnDamageText(`+${healAmount} HP`, closestCapy.x, closestCapy.y - 60);
+            createParticles(closestCapy.x, closestCapy.y, '#69F0AE', 15); // Healing particles
+        }
+
         updateHUD();
     });
 
