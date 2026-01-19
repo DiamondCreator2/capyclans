@@ -119,8 +119,8 @@
     <div id="ui-layer" class="flex flex-col justify-between p-4">
         
         <!-- Top HUD -->
-        <div class="flex justify-between items-start pointer-events-auto">
-            <div class="hud-panel p-3 flex items-center space-x-4">
+        <div class="flex justify-between items-start pointer-events-none">
+            <div class="hud-panel p-3 flex items-center space-x-4 pointer-events-auto">
                 <div class="flex items-center space-x-2">
                     <span class="text-4xl">🍊</span>
                     <div>
@@ -138,16 +138,16 @@
                 </div>
             </div>
             
-            <button id="pause-btn" class="hud-panel p-3 text-2xl hover:bg-gray-100 btn-primary rounded-lg">
+            <button id="pause-btn" class="hud-panel p-3 text-2xl hover:bg-gray-100 btn-primary rounded-lg pointer-events-auto">
                 ⏸️
             </button>
         </div>
 
         <!-- Bottom HUD -->
-        <div class="flex justify-center items-end space-x-4 pointer-events-auto pb-2">
+        <div class="flex justify-center items-end space-x-4 pb-2 pointer-events-none">
             
             <!-- Selection Panel (Hidden by default) -->
-            <div id="selection-panel" class="hidden hud-panel p-4 w-96 flex flex-col space-y-2 relative">
+            <div id="selection-panel" class="hidden hud-panel p-4 w-96 flex flex-col space-y-2 relative pointer-events-auto">
                 <button id="close-selection" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 font-bold">X</button>
                 <h3 class="text-xl text-center text-amber-800 border-b-2 border-amber-100 pb-1" id="sel-name">Baby Capy</h3>
                 
@@ -163,7 +163,7 @@
             </div>
 
             <!-- Main Actions -->
-            <div class="hud-panel p-3 flex flex-col items-center">
+            <div class="hud-panel p-3 flex flex-col items-center pointer-events-auto">
                 <div class="text-xs font-bold text-gray-400 uppercase mb-1">Recruitment</div>
                 <button id="recruit-btn" class="btn-primary px-6 py-3 rounded-xl flex flex-col items-center w-40">
                     <span class="text-lg">Recruit Capy</span>
@@ -189,7 +189,7 @@ const uiLayer = document.getElementById('ui-layer');
 const state = {
     oranges: 50,
     wave: 1,
-    totalEnemiesDefeated: 0, // Added tracker
+    totalEnemiesDefeated: 0,
     gameSpeed: 1,
     paused: false,
     lastTime: 0,
@@ -200,20 +200,19 @@ const state = {
     projectiles: [],
     particles: [],
     enemySpawnTimer: 0,
-    enemySpawnRate: 300, // Frames (Slowed down from 200)
+    enemySpawnRate: 300, 
     cameraX: 0,
     screenShake: 0
 };
 
 // Configuration
 const CONFIG = {
-    GROUND_Y: 0, // Calculated on resize
+    GROUND_Y: 0, 
     LANE_HEIGHT: 150,
     MAX_SQUAD: 10,
     CLASSES: {
         BABY: { name: 'Baby Capy', hp: 20, dmg: 3, range: 40, speed: 1.5, color: '#8B5A2B', cost: 0, cd: 60, scale: 0.6, type: 'melee' },
         WARRIOR: { name: 'Knight Capy', hp: 120, dmg: 15, range: 50, speed: 0.8, color: '#6D4C41', cost: 50, cd: 80, scale: 1.1, type: 'melee' },
-        // Reduced Ranger range (250->150) and speed (1.2->0.9) to keep them with the pack
         RANGER: { name: 'Ranger Capy', hp: 60, dmg: 12, range: 150, speed: 0.9, color: '#A1887F', cost: 60, cd: 50, scale: 0.9, type: 'ranged' },
         WIZARD: { name: 'Wizard Capy', hp: 45, dmg: 30, range: 200, speed: 0.7, color: '#5D4037', cost: 80, cd: 100, scale: 0.9, type: 'magic' }
     },
@@ -246,7 +245,7 @@ class Entity {
         this.hitFlash = 0;
         this.width = 40 * this.scale;
         this.height = 30 * this.scale;
-        this.stats = stats; // Store reference to stats config
+        this.stats = stats; 
     }
 
     takeDamage(amount) {
@@ -294,7 +293,6 @@ class Entity {
     }
 
     drawBody(ctx) {
-        // Placeholder, overridden by subclasses
         ctx.fillStyle = this.color;
         ctx.fillRect(-20, -20, 40, 40);
     }
@@ -326,7 +324,7 @@ class Capybara extends Entity {
         spawnDamageText("EVOLVED!", this.x, this.y - 60);
     }
 
-    update() {
+    update(leaderX) {
         if (this.isDead) return;
 
         // Find Target
@@ -341,6 +339,12 @@ class Capybara extends Entity {
         }
         this.target = closest;
 
+        // Squad Cohesion: Catch up if too far behind the leader
+        let actualSpeed = this.speed;
+        if (leaderX !== undefined && (leaderX - this.x) > 300) {
+            actualSpeed *= 2.5; 
+        }
+
         // Move or Attack
         if (this.target && dist <= this.range) {
             // Attack
@@ -350,7 +354,7 @@ class Capybara extends Entity {
             }
         } else {
             // Move (slowly if no target, or towards right)
-            this.x += this.speed;
+            this.x += actualSpeed;
         }
 
         if (this.cooldown > 0) this.cooldown--;
@@ -679,20 +683,13 @@ function updateGame() {
         updateHUD();
     }
 
+    // Calculate Leader Position (Rightmost Capy) to keep squad together
+    const leaderX = state.capys.length > 0 ? Math.max(...state.capys.map(c => c.x)) : 0;
+
     // Update Entities
-    state.capys.forEach(e => e.update());
+    state.capys.forEach(e => e.update(leaderX));
     state.enemies.forEach(e => e.update());
     state.projectiles.forEach(p => p.update());
-    state.particles.forEach(p => {
-        if(p.update) p.update();
-        else { // Text particle
-            p.y += p.vy;
-            p.life -= 0.02;
-        }
-    });
-
-    // Clean up
-    state.capys = state.capys.filter(e => !e.isDead);
     
     // Reward for dead enemies
     const deadEnemies = state.enemies.filter(e => e.isDead && e.hp <= 0); // hp check ensures we don't count despawns
